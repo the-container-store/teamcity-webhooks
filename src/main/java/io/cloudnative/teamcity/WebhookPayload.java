@@ -22,6 +22,7 @@ public class WebhookPayload {
   static class PayloadBuild {
     String full_url;
     String build_id;
+    String eventType;
     String status;
     Scm    scm;
     Map<String,Map<String,String>> artifacts;

@@ -37,11 +37,32 @@ public class WebhooksListener extends BuildServerAdapter {
 
 
   @Override
+  public void buildStarted(@NonNull SRunningBuild build) {
+    val time = System.currentTimeMillis();
+    try {
+      val gson    = new Gson();
+      val payload = gson.toJson(buildPayload(build, "buildStarted", "started"));
+      gson.fromJson(payload, Map.class); // Sanity check of JSON generated
+      log("Build '%s/#%s' finished, payload is '%s'".f(build.getFullName(), build.getBuildNumber(), payload));
+
+      for (val url : settings.getUrls(build.getProjectExternalId())){
+        postPayload(url, payload);
+      }
+
+      log("Operation finished in %s ms".f(System.currentTimeMillis() - time));
+    }
+    catch (Throwable t) {
+      error("Failed to listen on buildStarted() of '%s' #%s".f(build.getFullName(), build.getBuildNumber()), t);
+    }
+  }
+
+  @Override
   public void buildFinished(@NonNull SRunningBuild build) {
     val time = System.currentTimeMillis();
     try {
       val gson    = new Gson();
-      val payload = gson.toJson(buildPayload(build));
+      val payload = gson.toJson(buildPayload(build, "buildFinished",
+              build.getBuildType().getStatusDescriptor().getStatusDescriptor().getText().toLowerCase()));
       gson.fromJson(payload, Map.class); // Sanity check of JSON generated
       log("Build '%s/#%s' finished, payload is '%s'".f(build.getFullName(), build.getBuildNumber(), payload));
 
@@ -59,7 +80,7 @@ public class WebhooksListener extends BuildServerAdapter {
 
   @SuppressWarnings({"FeatureEnvy" , "ConstantConditions"})
   @SneakyThrows(VcsException.class)
-  private WebhookPayload buildPayload(@NonNull SBuild build){
+  private WebhookPayload buildPayload(@NonNull SBuild build, String eventType, String status){
     Scm scm      = null;
     val vcsRoots = build.getBuildType().getVcsRootInstanceEntries();
 
@@ -76,7 +97,8 @@ public class WebhooksListener extends BuildServerAdapter {
                                                              build.getBuildType().getExternalId(),
                                                              build.getBuildId())).
       build_id(build.getBuildNumber()).
-      status(build.getBuildType().getStatusDescriptor().getStatusDescriptor().getText().toLowerCase()).
+      eventType(eventType).
+      status(status).
       scm(scm).
       artifacts(artifacts(build)).
       build();
