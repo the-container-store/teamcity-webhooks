@@ -45,7 +45,7 @@ public class WebhooksListener extends BuildServerAdapter {
       gson.fromJson(payload, Map.class); // Sanity check of JSON generated
       log("Build '%s/#%s' finished, payload is '%s'".f(build.getFullName(), build.getBuildNumber(), payload));
 
-      for (val url : settings.getUrls(build.getProjectExternalId())){
+      for (val url : collectUrls(build)){
         postPayload(url, payload);
       }
 
@@ -66,7 +66,7 @@ public class WebhooksListener extends BuildServerAdapter {
       gson.fromJson(payload, Map.class); // Sanity check of JSON generated
       log("Build '%s/#%s' finished, payload is '%s'".f(build.getFullName(), build.getBuildNumber(), payload));
 
-      for (val url : settings.getUrls(build.getProjectExternalId())){
+      for (val url : collectUrls(build)){
         postPayload(url, payload);
       }
 
@@ -77,6 +77,18 @@ public class WebhooksListener extends BuildServerAdapter {
     }
   }
 
+  private Set<String> collectUrls(@NonNull SRunningBuild build) {
+    Set<String> urls = settings.getUrls(build.getProjectExternalId());
+    return maybeAddParentProjectUrls(build.getBuildType().getParent(), urls);
+  }
+
+  private Set<String> maybeAddParentProjectUrls(SPersistentEntity parent, Set<String> urls) {
+    if (parent != null && parent instanceof SProject) {
+      urls.addAll(settings.getUrls(parent.getExternalId()));
+      return maybeAddParentProjectUrls(parent.getParent(), urls);
+    }
+    return urls;
+  }
 
   @SuppressWarnings({"FeatureEnvy" , "ConstantConditions"})
   @SneakyThrows(VcsException.class)
